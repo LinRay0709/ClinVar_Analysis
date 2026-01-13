@@ -2,3 +2,9 @@
 data/
 data_0107/
 data_new/
+
+output/
+
+__pycache__/
+*.pyc
+.DS_Store

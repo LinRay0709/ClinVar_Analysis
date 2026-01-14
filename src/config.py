@@ -23,5 +23,8 @@ CSV_HEADER = [
     "clnsig_raw", "mc_raw"
 ]
 
-#  FASTA檔路徑
+# FASTA檔路徑
 REF_DIR = os.path.join(BASE_DIR, "data", "FASTA_data_from_HW1")
+
+# SNV前後128 bases的檔案
+SEQUENCES_FILE = os.path.join(OUTPUT_DIR, "all_sequences.tsv")

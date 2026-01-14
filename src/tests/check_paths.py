@@ -20,6 +20,8 @@ print(f"VCF 檔案路徑:\n  {config.VCF_FILE}")
 print("-" * 20)
 print(f"輸出檔案路徑:\n  {config.OUTPUT_FILE}")
 print("="*30)
+print(f"FASTA資料夾路徑:\n  {config.REF_DIR}")
+print("="*30)
 
 # 檢查檔案是否真的存在
 import os

@@ -22,3 +22,6 @@ CSV_HEADER = [
     "clnsig_category", "mc_category",
     "clnsig_raw", "mc_raw"
 ]
+
+#  FASTA檔路徑
+REF_DIR = os.path.join(BASE_DIR, "data", "FASTA_data_from_HW1")

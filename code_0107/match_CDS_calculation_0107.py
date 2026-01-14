@@ -273,6 +273,7 @@ def main():
     first_three_matches = []
     
     bed_region_count = 0
+    total_matched_count = 0
     
     with open(bed_file, 'r') as bed_in:
         for line in bed_in:
@@ -298,6 +299,7 @@ def main():
             # 使用 fetch 找重疊的 SNV
             try:
                 for record in vcf_reader.fetch(chrom, start, end):
+                    total_matched_count += 1
                     pos = record.pos
                     ref = record.ref
                     alt = ",".join(record.alts) if record.alts else "."
@@ -333,6 +335,7 @@ def main():
     vcf_reader.close()
     
     print(f"已處理 {bed_region_count} 個 BED 區間")
+    print(f'總共配對: {total_matched_count}')
 
     # ==========================================
     # [新增功能] 檢查與統計衝突情況

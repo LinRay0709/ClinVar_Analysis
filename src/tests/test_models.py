@@ -1,4 +1,12 @@
 # src/test_models.py
+import sys
+import os
+
+dir_path = os.path.dirname(os.path.realpath(__file__))
+parent_dir = os.path.abspath(os.path.join(dir_path, ".."))
+if parent_dir not in sys.path:
+    sys.path.append(parent_dir)
+
 from models import MatchedVariant
 
 # 1. 模擬一筆測試資料 (假裝這是從 VCF 讀到的)

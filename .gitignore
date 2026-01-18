@@ -9,6 +9,10 @@ code_1224/
 
 output/
 
+RDDL/ClinVar/USER_pos/
+RDDL/ClinVar/USER_neg/
+RDDL/RDDL_outputs/
+
 __pycache__/
 *.pyc
 .DS_Store

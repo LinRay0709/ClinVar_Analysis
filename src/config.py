@@ -39,7 +39,7 @@ PROCESSED_DIR = os.path.join(BASE_DIR, "output", "processed")
 # 注意: CD-HIT 會自動在 output prefix 後面加上 .clstr
 CDHIT_CLSTR_FILE = CDHIT_OUTPUT_PREFIX + ".clstr"
 
-# 最終切分好的資料集路徑
+# 切分好的資料集路徑
 TRAIN_FILE = os.path.join(PROCESSED_DIR, "train.csv")
 VAL_FILE   = os.path.join(PROCESSED_DIR, "val.csv")
 TEST_FILE  = os.path.join(PROCESSED_DIR, "test.csv")
@@ -71,3 +71,22 @@ CDHIT_PREPARE_READ_COLS = [
     "alt_seq"
 ]
 
+# ==========================================
+# RDDL
+# ==========================================
+
+TASK_NAME = "ClinVar"          # RDDL 任務名稱
+RDDL_DIR_NAME = "RDDL"         # RDDL 套件所在的資料夾名稱
+DATA_SOURCE_DIR = "data"       # 原始 CSV 存放位置
+
+# 設定 RDDL 任務目標路徑: ./RDDL/ClinVar/
+RDDL_TASK_DIR = os.path.join(BASE_DIR, RDDL_DIR_NAME, TASK_NAME)
+POS_DIR = os.path.join(RDDL_TASK_DIR, 'USER_pos')
+NEG_DIR = os.path.join(RDDL_TASK_DIR, 'USER_neg')
+SPLIT_INFO_DIR = os.path.join(RDDL_TASK_DIR, 'RDDL_splitting_info')
+
+# 原始資料來源路徑
+CSV_SOURCE_PATH = os.path.join(BASE_DIR, DATA_SOURCE_DIR)
+
+# DNA 轉換字典
+DNA_MAP = {'A': 0, 'C': 1, 'G': 2, 'T': 3}

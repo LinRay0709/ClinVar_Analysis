@@ -108,7 +108,8 @@ def main():
     
     with open(OUTPUT_PATH, 'w') as f_out:
         # 寫入 Header
-        header = ["snv_key", "chrom", "pos", "ref", "alt", "ref_seq", "alt_seq"]
+        header = ["snv_key", "chrom", "pos", "ref", "alt", 
+                  "feature_type", "mc_category", "clnsig_category", "ref_seq", "alt_seq"]
         f_out.write("\t".join(header) + "\n")
         
         processed_count = 0
@@ -127,6 +128,9 @@ def main():
                     pos_1based = int(row['pos'])
                     ref_base = row['ref']
                     alt_base = row['alt']
+                    feat_type = str(row['feature_type'])
+                    mc_cat = str(row['mc_category'])
+                    clnsig_cat = str(row['clnsig_category'])
                     
                     # 建立唯一 ID
                     snv_key = f"{chrom}:{pos_1based}:{ref_base}:{alt_base}"
@@ -159,6 +163,9 @@ def main():
                         str(pos_1based),
                         ref_base,
                         alt_base,
+                        feat_type,
+                        mc_cat,
+                        clnsig_cat,
                         full_ref_seq,
                         full_alt_seq
                     ]

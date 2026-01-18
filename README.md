@@ -2,6 +2,8 @@
 
 這是一個生物資訊資料處理專案，目標是從 VCF 變異檔與 ClinVar 資料庫中提取 Single Nucleotide Variants (SNV)，並擷取變異點前後的基因序列（Context Sequence），最終產生適用於深度學習模型訓練的結構化資料集。
 
+env用clinvar_env
+
 ## 📁 專案架構 (Project Structure)
 
 目前專案的檔案結構與功能說明如下：

@@ -108,8 +108,7 @@ def main():
     
     with open(OUTPUT_PATH, 'w') as f_out:
         # 寫入 Header
-        header = ["snv_key", "chrom", "pos", "ref", "alt", 
-                  "feature_type", "mc_category", "clnsig_category", "ref_seq", "alt_seq"]
+        header = config.SEQ_CSV_HEADER
         f_out.write("\t".join(header) + "\n")
         
         processed_count = 0

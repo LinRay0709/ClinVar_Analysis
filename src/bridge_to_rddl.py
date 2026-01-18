@@ -19,15 +19,15 @@ def main():
     test_df = utils.process_dataset('test.csv', 'Test Set')
     if test_df is not None:
         out_path = os.path.join(cfg.SPLIT_INFO_DIR, 'test.csv')
-        test_df.to_csv(out_path, index=False, header=False)
-        print(f"-> 已建立測試清單: {out_path}")
+        test_df.to_csv(out_path, index=False)
+        print(f"-> 已建立測試清單(含header): {out_path}")
 
     # 3. 處理 Ensemble Set
     ensem_df = utils.process_dataset('ensem.csv', 'Ensemble Set')
     if ensem_df is not None:
         out_path = os.path.join(cfg.SPLIT_INFO_DIR, 'ensemble.csv')
-        ensem_df.to_csv(out_path, index=False, header=False)
-        print(f"-> 已建立驗證清單: {out_path}")
+        ensem_df.to_csv(out_path, index=False)
+        print(f"-> 已建立驗證清單(含header): {out_path}")
 
     # 4. 處理 Training Set 並切分 5-Fold
     train_df = utils.process_dataset('train.csv', 'Training Set')
@@ -38,7 +38,7 @@ def main():
         
         for i, fold_df in enumerate(folds):
             out_path = os.path.join(cfg.SPLIT_INFO_DIR, f'training_{i+1}.csv')
-            fold_df.to_csv(out_path, index=False, header=False)
+            fold_df.to_csv(out_path, index=False)
             print(f"  -> Fold {i+1}: 已建立")
 
     print("\n✅ 所有轉換作業完成！")

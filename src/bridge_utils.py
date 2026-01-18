@@ -21,7 +21,7 @@ def one_hot_encode(sequence):
             
     return one_hot
 
-def save_pickle_and_get_path(row, output_dir, relative_dir_name):
+def save_pickle_and_get_path(row, output_dir):
     """
     將單筆資料轉成矩陣並存檔，回傳 RDDL 需要的相對路徑
     同時編碼 Ref 和 Alt，並以 (Length, 8) 的格式儲存
@@ -50,7 +50,7 @@ def save_pickle_and_get_path(row, output_dir, relative_dir_name):
         pickle.dump(combined_tensor, f)
         
     # 回傳相對路徑
-    return os.path.join(relative_dir_name, filename)
+    return filepath
 
 def process_dataset(csv_filename, dataset_type):
     """
@@ -86,7 +86,11 @@ def process_dataset(csv_filename, dataset_type):
             rel_dir = "USER_neg"
             
         # 執行存檔
-        rel_path = save_pickle_and_get_path(row, target_dir, rel_dir)
-        file_list.append([rel_path, label])
+        abs_path = save_pickle_and_get_path(row, target_dir)
+
+        # 配合RDDL要求加上weight
+        weight = 1.0
+
+        file_list.append([abs_path, label, weight])
         
-    return pd.DataFrame(file_list, columns=['path', 'label'])
+    return pd.DataFrame(file_list, columns=['path', 'label', 'weight'])

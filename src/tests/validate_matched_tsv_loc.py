@@ -98,6 +98,7 @@ def validate_locations(tsv_path, gtf_data):
             
             try:
                 chrom = row['chrom']
+                #tsv是1-based
                 pos = int(row['pos'])
                 transcript_id = row['transcript_id']
                 feature_type = row['feature_type']

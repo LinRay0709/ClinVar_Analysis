@@ -21,7 +21,7 @@ from src.extract_seq.ref_seq_consistency_check import load_fasta_sequence
 # ==========================================
 IS_DEBUG = False            # 正式執行時改成 False
 DEBUG_LIMIT = 10           # 只抓前 10 筆
-CONTEXT_RADIUS = 128         # 前後各抓 5 bp (正式版請改 128)
+CONTEXT_RADIUS = 512         # 前後各抓 5 bp (正式版請改 128)
 
 # 輸出路徑邏輯
 if IS_DEBUG:
@@ -46,7 +46,7 @@ def get_padded_sequence(seq_str, pos_0based, radius):
     
     # 計算想要抓取的範圍
     start = pos_0based - radius
-    end = pos_0based + radius + 1 # Python 切片 end 是不包含的，所以要 +1
+    end = pos_0based + radius + 1 -1 # Python 切片 end 是不包含的，所以要 +1，但抓共1024(512+1+511)
     
     # 初始化補白
     left_pad = ""
@@ -55,13 +55,13 @@ def get_padded_sequence(seq_str, pos_0based, radius):
     # 處理左邊界 (如果 start < 0)
     real_start = start
     if start < 0:
-        left_pad = "N" * abs(start)
+        left_pad = "@" * abs(start)
         real_start = 0
         
     # 處理右邊界 (如果 end > seq_len)
     real_end = end
     if end > seq_len:
-        right_pad = "N" * (end - seq_len)
+        right_pad = "@" * (end - seq_len)
         real_end = seq_len
         
     # 抓取實際存在的序列
@@ -74,8 +74,8 @@ def get_padded_sequence(seq_str, pos_0based, radius):
 def main():
     print("="*60)
     print(f"序列提取程式 ({'DEBUG 模式' if IS_DEBUG else '正式模式'})")
-    print(f"  - 抓取範圍: Ref +/- {CONTEXT_RADIUS} bp")
-    print(f"  - 預期總長: {CONTEXT_RADIUS * 2 + 1} bp")
+    print(f"  - 抓取範圍: Ref 前後,總長度: {CONTEXT_RADIUS*2} bp")
+    print(f"  - 預期總長: {CONTEXT_RADIUS * 2} bp")
     if IS_DEBUG:
         print(f"  - 限制筆數: 前 {DEBUG_LIMIT} 筆")
     print("="*60)

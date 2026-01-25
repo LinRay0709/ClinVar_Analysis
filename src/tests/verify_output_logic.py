@@ -35,14 +35,14 @@ def main():
     for idx, row in df.iterrows():
         try:
             # 1. 檢查長度
-            if len(row['ref_seq']) != 257 or len(row['alt_seq']) != 257:
+            if len(row['ref_seq']) != 1024 or len(row['alt_seq']) != 1024:
                 print(f"[錯誤] 行 {idx+2}: 序列長度不正確 (Ref: {len(row['ref_seq'])}, Alt: {len(row['alt_seq'])})")
                 errors += 1
                 if errors > 5: break
                 continue
 
-            # 2. 檢查中心點 (0-based index 128 is the 129th base)
-            center_idx = 128
+            # 2. 檢查中心點 (0-based index 512 is the 512th base)
+            center_idx = 512
             ref_center = row['ref_seq'][center_idx]
             alt_center = row['alt_seq'][center_idx]
             
@@ -80,6 +80,31 @@ def main():
     if len(n_alts) > 0:
         print(f"\n[資訊] 發現 {len(n_alts)} 筆 Alt 為 'N' 的資料。範例:")
         print(n_alts[['chrom', 'pos', 'ref', 'alt']].head(3).to_string(index=False))
+
+     # 新增功能：檢查 ref_seq 或 alt_seq 含有 @ 符號的資料
+    at_in_ref = df[df['ref_seq'].str.contains('@', na=False)]
+    at_in_alt = df[df['alt_seq'].str.contains('@', na=False)]
+    at_rows = pd.concat([at_in_ref, at_in_alt]).drop_duplicates()
+    
+    if len(at_rows) > 0:
+        print(f"\n[警告] 發現 {len(at_rows)} 筆 ref_seq 或 alt_seq 含有 '@' 符號的資料:")
+        print(at_rows[['snv_key', 'chrom', 'pos', 'ref', 'alt']].to_string(index=False))
+    else:
+        print("\n[資訊] 沒有發現 ref_seq 或 alt_seq 含有 '@' 符號的資料。")
+
+    # 新增功能：檢查 ref_seq 或 alt_seq 含有小寫字母的資料
+    # 使用正則表達式 [a-z] 檢查是否有小寫字母
+    lower_in_ref = df[df['ref_seq'].str.contains('[a-z]', na=False, regex=True)]
+    lower_in_alt = df[df['alt_seq'].str.contains('[a-z]', na=False, regex=True)]
+    lower_rows = pd.concat([lower_in_ref, lower_in_alt]).drop_duplicates()
+    
+    if len(lower_rows) > 0:
+        print(f"\n[警告] 發現 {len(lower_rows)} 筆 ref_seq 或 alt_seq 含有小寫字母的資料:")
+        print(lower_rows[['snv_key', 'chrom', 'pos', 'ref', 'alt']].head(10).to_string(index=False))
+        if len(lower_rows) > 10:
+            print(f"  ... 還有 {len(lower_rows) - 10} 筆未顯示")
+    else:
+        print("\n[資訊] 沒有發現 ref_seq 或 alt_seq 含有小寫字母的資料。")
 
 if __name__ == "__main__":
     main()

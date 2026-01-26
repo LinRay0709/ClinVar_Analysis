@@ -1,4 +1,4 @@
-# src/tests/verify_pkl_num_format.py
+# src/tests/verify_pkl_num_accuracy.py
 # 遍歷所有 pickle 檔案，檢查數量、形狀、數值是否正確
 
 import os
@@ -25,7 +25,10 @@ VALID_VALUES = {0.0, 0.25, 1.0}  # 合法數值
 def check_pickle_file(filepath):
     """
     檢查單一 pickle 檔案
-    回傳: (is_valid, error_message)
+    回傳: (is_valid, error_message, has_025)
+    - is_valid: 是否通過驗證
+    - error_message: 錯誤訊息
+    - has_025: 是否包含 0.25 值
     """
     try:
         with open(filepath, 'rb') as f:
@@ -33,19 +36,22 @@ def check_pickle_file(filepath):
         
         # 1. 檢查形狀
         if data.shape != EXPECTED_SHAPE:
-            return False, f"形狀錯誤: {data.shape} (預期 {EXPECTED_SHAPE})"
+            return False, f"形狀錯誤: {data.shape} (預期 {EXPECTED_SHAPE})", False
         
         # 2. 檢查數值
         unique_vals = np.unique(data)
         invalid_vals = [v for v in unique_vals if not any(np.isclose(v, valid) for valid in VALID_VALUES)]
         
         if invalid_vals:
-            return False, f"包含非法數值: {invalid_vals}"
+            return False, f"包含非法數值: {invalid_vals}", False
         
-        return True, "OK"
+        # 3. 檢查是否包含 0.25
+        has_025 = any(np.isclose(v, 0.25) for v in unique_vals)
+        
+        return True, "OK", has_025
         
     except Exception as e:
-        return False, f"讀取失敗: {e}"
+        return False, f"讀取失敗: {e}", False
 
 def main():
     print("="*60)
@@ -81,12 +87,15 @@ def main():
     
     errors = []
     valid_count = 0
+    files_with_025 = []  # 含有 0.25 的檔案清單
     
     for i, filepath in enumerate(all_files):
-        is_valid, msg = check_pickle_file(filepath)
+        is_valid, msg, has_025 = check_pickle_file(filepath)
         
         if is_valid:
             valid_count += 1
+            if has_025:
+                files_with_025.append(os.path.basename(filepath))
         else:
             errors.append((os.path.basename(filepath), msg))
         
@@ -101,6 +110,16 @@ def main():
     print(f"總檔案數: {total_count}")
     print(f"通過驗證: {valid_count}")
     print(f"驗證失敗: {len(errors)}")
+    
+    # 顯示含有 0.25 的檔案統計
+    print(f"\n[0.25 值統計] (含有 N 編碼的檔案)")
+    print(f"  - 含有 0.25 的檔案數: {len(files_with_025)}")
+    if files_with_025:
+        print(f"  - 範例檔案 (前 5 個):")
+        for filename in files_with_025[:5]:
+            print(f"      {filename}")
+        if len(files_with_025) > 5:
+            print(f"      ... 還有 {len(files_with_025) - 5} 個檔案")
     
     if errors:
         print(f"\n[錯誤清單] (前 20 筆):")

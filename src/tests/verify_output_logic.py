@@ -1,5 +1,5 @@
 # tests/verify_output_logic.py
-#檢查all_sequence.tsv的ref_seq和alt_seq是否都是257bases -> 中間是否等於ref/alt -> ref_seq和alt_seq去掉中間後是否相同
+#檢查all_sequence.tsv的ref_seq和alt_seq是否都是1024bases -> 中間是否等於ref/alt -> ref_seq和alt_seq去掉中間後是否相同
 
 import sys
 import os
@@ -105,6 +105,20 @@ def main():
             print(f"  ... 還有 {len(lower_rows) - 10} 筆未顯示")
     else:
         print("\n[資訊] 沒有發現 ref_seq 或 alt_seq 含有小寫字母的資料。")
+
+    # 新增功能：檢查 ref 或 alt 為 '.' 的資料
+    dot_in_ref = df[df['ref'] == '.']
+    dot_in_alt = df[df['alt'] == '.']
+    dot_rows = pd.concat([dot_in_ref, dot_in_alt]).drop_duplicates()
+    
+    if len(dot_rows) > 0:
+        print(f"\n[警告] 發現 {len(dot_rows)} 筆 ref 或 alt 為 '.' 的資料:")
+        print(dot_rows[['snv_key', 'chrom', 'pos', 'ref', 'alt']].head(10).to_string(index=False))
+        if len(dot_rows) > 10:
+            print(f"  ... 還有 {len(dot_rows) - 10} 筆未顯示")
+    else:
+        print("\n[資訊] 沒有發現 ref 或 alt 為 '.' 的資料。")
+
 
 if __name__ == "__main__":
     main()

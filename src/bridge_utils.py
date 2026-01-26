@@ -9,6 +9,11 @@ def one_hot_encode(sequence):
     """
     將 DNA 字串轉換為 One-Hot 編碼 (Numpy Array)
     格式: (Length, 4) -> 專為 Keras/TensorFlow 設計
+    
+    特殊處理:
+    - A, C, G, T: 標準 One-Hot (1 在對應位置)
+    - N: 均勻分布 [0.25, 0.25, 0.25, 0.25]
+    - @: 全零 [0, 0, 0, 0] (表示超出基因體範圍)
     """
     seq_len = len(sequence)
     one_hot = np.zeros((seq_len, 4), dtype=np.float32)
@@ -16,9 +21,18 @@ def one_hot_encode(sequence):
     for i, base in enumerate(sequence):
         base = base.upper()
         if base in cfg.DNA_MAP:
+            # 標準鹼基: A, C, G, T
             idx = cfg.DNA_MAP[base]
             one_hot[i, idx] = 1.0
-            
+        elif base == 'N':
+            # N: 不確定鹼基，用均勻分布表示
+            one_hot[i, :] = 0.25
+        elif base == '@':
+            # @: 超出基因體範圍，保持全零
+            pass  # 已經是 0
+        else:
+            print(f"[警告] 遇到未知的鹼基: {base}")
+    
     return one_hot
 
 def save_pickle_and_get_path(row, output_dir):
@@ -39,10 +53,10 @@ def save_pickle_and_get_path(row, output_dir):
     ref_seq = row['ref_seq']
     alt_seq = row['alt_seq']
 
-    ref_tensor = one_hot_encode(ref_seq)  # Shape: (257, 4)
-    alt_tensor = one_hot_encode(alt_seq)  # Shape: (257, 4)
+    ref_tensor = one_hot_encode(ref_seq)  # Shape: (1024, 4)
+    alt_tensor = one_hot_encode(alt_seq)  # Shape: (1024, 4)
 
-    # axis=1 代表在「頻道」方向合併 -> (257, 4+4) = (257, 8)
+    # axis=1 代表在「頻道」方向合併 -> (1024, 4+4) = (1024, 8)
     combined_tensor = np.concatenate([ref_tensor, alt_tensor], axis=1)
     
     # 'wb': 二進位模式

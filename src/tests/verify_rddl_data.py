@@ -79,20 +79,42 @@ def check_pickle_content(abs_path):
         print(f"✅ 載入成功！")
         print(f"  - 資料形狀 (Shape): {data.shape}")
         
-        # 檢查 Ref/Alt 是否都存在 (257, 8)
-        if data.shape == (257, 8):
-            print(f"✅ [通過] 形狀符合 Ref+Alt 設計 (257, 8)")
-        elif data.shape == (257, 4):
-            print(f"⚠️ [注意] 形狀為 (257, 4)，只有單一序列。")
+        # 檢查 Ref/Alt 是否都存在 (1024, 8)
+        if data.shape == (1024, 8):
+            print(f"✅ [通過] 形狀符合 Ref+Alt 設計 (1024, 8)")
+        elif data.shape == (1024, 4):
+            print(f"⚠️ [注意] 形狀為 (1024, 4)，只有單一序列。")
         else:
             print(f"⚠️ [警告] 形狀異常: {data.shape}")
 
-        # 檢查數值
+        # 檢查數值 (新規則: 0, 0.25, 1 都是合法的)
+        # 0: @字元 或 0位置的 one-hot
+        # 0.25: N字元 (均勻分布)
+        # 1: 標準鹼基 ACGT 的 one-hot
         unique_vals = np.unique(data)
-        if np.all(np.isin(unique_vals, [0, 1])):
-            print(f"✅ [通過] 數值為 One-Hot (0/1)。")
+        valid_vals = {0.0, 0.25, 1.0}
+        
+        # 使用 np.isclose 處理浮點數精度
+        all_valid = all(any(np.isclose(v, valid) for valid in valid_vals) for v in unique_vals)
+        
+        if all_valid:
+            print(f"✅ [通過] 數值符合編碼規則。")
+            print(f"  - 出現的數值: {sorted(unique_vals)}")
+            
+            # 統計特殊字元
+            count_025 = np.sum(np.isclose(data, 0.25))
+            count_zeros_row = np.sum(np.all(data == 0, axis=1))  # 整行都是0 (對應 @)
+            
+            if count_025 > 0:
+                print(f"  - 包含 N 編碼 (0.25): 共 {count_025} 個數值")
+            if count_zeros_row > 0:
+                # 因為 ref+alt 合併，所以檢查前4欄和後4欄
+                ref_zeros = np.sum(np.all(data[:, :4] == 0, axis=1))
+                alt_zeros = np.sum(np.all(data[:, 4:] == 0, axis=1))
+                print(f"  - 包含 @ 編碼 (全零行): Ref 有 {ref_zeros} 個, Alt 有 {alt_zeros} 個")
         else:
-            print(f"❌ [失敗] 發現非 0/1 的數值。")
+            unexpected = [v for v in unique_vals if not any(np.isclose(v, valid) for valid in valid_vals)]
+            print(f"❌ [失敗] 發現非法數值: {unexpected}")
             
     except Exception as e:
         print(f"❌ Pickle 解析失敗: {e}")

@@ -23,7 +23,8 @@ def main():
         print(f"-> 已建立測試清單(含header): {out_path}")
 
     # 3. 處理 Ensemble Set
-    ensem_df = utils.process_dataset('ensem.csv', 'Ensemble Set')
+    # 注意: 讀取 val.csv，但輸出為 ensemble.csv (RDDL 命名慣例)
+    ensem_df = utils.process_dataset('val.csv', 'Ensemble Set')
     if ensem_df is not None:
         out_path = os.path.join(cfg.SPLIT_INFO_DIR, 'ensemble.csv')
         ensem_df.to_csv(out_path, index=False)

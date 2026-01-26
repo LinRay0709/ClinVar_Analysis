@@ -73,12 +73,17 @@ def process_dataset(csv_filename, dataset_type):
     csv_path = os.path.join(cfg.CSV_SOURCE_PATH, csv_filename)
     
     if not os.path.exists(csv_path):
-        print(f"[跳過] 找不到檔案: {csv_path}")
+        print(f"[警告] 找不到檔案: {csv_path}")
         return None
         
     print(f"正在處理 {dataset_type} ({csv_filename})...")
     
     df = pd.read_csv(csv_path)
+    
+    # 檢查檔案是否為空
+    if len(df) == 0:
+        print(f"[警告] 檔案為空: {csv_path}")
+        return None
     
     # 檢查必要欄位
     required_cols = ['alt_seq', 'ref_seq', 'label']

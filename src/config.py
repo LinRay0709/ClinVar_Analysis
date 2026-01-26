@@ -86,7 +86,7 @@ NEG_DIR = os.path.join(RDDL_TASK_DIR, 'USER_neg')
 SPLIT_INFO_DIR = os.path.join(RDDL_TASK_DIR, 'RDDL_splitting_info')
 
 # 原始資料來源路徑
-CSV_SOURCE_PATH = os.path.join(BASE_DIR, DATA_SOURCE_DIR)
+CSV_SOURCE_PATH = PROCESSED_DIR
 
 # DNA 轉換字典
 DNA_MAP = {'A': 0, 'C': 1, 'G': 2, 'T': 3}

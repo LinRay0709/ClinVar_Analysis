@@ -9,8 +9,9 @@ code_1224/
 
 output/
 
-RDDL/ClinVar/USER_pos/
-RDDL/ClinVar/USER_neg/
+
+RDDL/ClinVar
+RDDL/ClinVar/RDDL_splitting_info
 RDDL/RDDL_outputs/
 
 __pycache__/

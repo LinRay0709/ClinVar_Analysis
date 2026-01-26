@@ -81,22 +81,23 @@ def main():
     count_dropna = before_dropna - after_dropna
 
     # 轉換 label 為整數 (0 或 1)
+    df_final = df_filtered.dropna(subset=['label']).copy()
     df_final['label'] = df_final['label'].astype(int)
 
-    # 3. 去重複 (Deduplication)
-    # 根據 snv_key 去重。因為基因組序列只看座標，同一座標的序列是一樣的
-    # 把重複的存入redundant_snvs.tsv
-    duplicate_mask = df_final.duplicated(subset=['snv_key'], keep='first')
-    redundant_df = df_final[duplicate_mask]
-    if len(redundant_df) > 0:
-        redundant_path = os.path.join(config.INTERIM_DIR, "redundant_snvs.tsv")
-        print(f"  -> 將冗餘資料備份至: {redundant_path}")
-        redundant_df.to_csv(redundant_path, sep='\t', index=False)
+    # # 3. 去重複 (Deduplication)
+    # # 根據 snv_key 去重。因為基因組序列只看座標，同一座標的序列是一樣的
+    # # 把重複的存入redundant_snvs.tsv
+    # duplicate_mask = df_final.duplicated(subset=['snv_key'], keep='first')
+    # redundant_df = df_final[duplicate_mask]
+    # if len(redundant_df) > 0:
+    #     redundant_path = os.path.join(config.INTERIM_DIR, "redundant_snvs.tsv")
+    #     print(f"  -> 將冗餘資料備份至: {redundant_path}")
+    #     redundant_df.to_csv(redundant_path, sep='\t', index=False)
 
-    clean_df = df_final[~duplicate_mask]
-    before_dedup = len(df_final)
-    df_final = clean_df
-    after_dedup = len(df_final)
+    # clean_df = df_final[~duplicate_mask]
+    # before_dedup = len(df_final)
+    # df_final = clean_df
+    # after_dedup = len(df_final)
     
     # 統計
     count_pos = (df_final['label'] == 1).sum()
@@ -104,17 +105,18 @@ def main():
     
     print("\n[最終統計]")
     print(f"  - dropna前/後筆數: {before_dropna}/{after_dropna}(差距:{count_dropna})")
-    print(f"  - 篩選後筆數 (含重複): {before_dedup}")
-    print(f"  - 去重後筆數 (Unique SNVs): {after_dedup} (移除 {before_dedup - after_dedup} 筆重複)")
+    # print(f"  - 篩選後筆數 (含重複): {before_dedup}")
+    # print(f"  - 去重後筆數 (Unique SNVs): {after_dedup} (移除 {before_dedup - after_dedup} 筆重複)")
+    print(f"  - 最終筆數: {len(df_final)}")
     print(f"  - Pathogenic (Label=1): {count_pos}")
     print(f"  - Benign     (Label=0): {count_neg}")
 
-    if after_dedup == 0:
-        print("\n[警告] 篩選後沒有資料！請檢查 mc_category 或 clnsig_category 的關鍵字是否正確。")
-        # 印出一些範例幫助除錯
-        print("資料中的 mc_category 範例:", df['mc_category'].unique()[:5])
-        print("資料中的 clnsig_category 範例:", df['clnsig_category'].unique()[:5])
-        return
+    # if after_dedup == 0:
+    #     print("\n[警告] 篩選後沒有資料！請檢查 mc_category 或 clnsig_category 的關鍵字是否正確。")
+    #     # 印出一些範例幫助除錯
+    #     print("資料中的 mc_category 範例:", df['mc_category'].unique()[:5])
+    #     print("資料中的 clnsig_category 範例:", df['clnsig_category'].unique()[:5])
+    #     return
 
     # 4. 寫入 FASTA
     # [修改] 使用 config.CDHIT_FASTA_FILE

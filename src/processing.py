@@ -6,9 +6,9 @@ import time
 from typing import List
 
 # 匯入我們定義好的模組
-import config
-import parsers
-from models import MatchedVariant
+from . import config
+from . import parsers
+from .models import MatchedVariant
 
 def process_bed_regions():
     """

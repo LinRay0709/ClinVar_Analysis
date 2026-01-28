@@ -112,4 +112,4 @@ def process_dataset(csv_filename, dataset_type):
 
         file_list.append([abs_path, label, weight])
         
-    return pd.DataFrame(file_list, columns=['path', 'label', 'weight'])
+    return pd.DataFrame(file_list, columns=['sample', 'label', 'weight'])

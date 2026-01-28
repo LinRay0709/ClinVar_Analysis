@@ -192,7 +192,7 @@ def make_data_batch(sample_paths, input_num, z_mean=None, z_std=None):
 
         if imghdr.what(path) is not None:
             arr = img_to_array(load_img(path))
-        elif str(path).endswith(('.pk', '.pickle')):
+        elif str(path).endswith(('.pk', '.pkl', '.pickle')):
             with open(path, 'rb') as f:
                 arr = pickle.load(f)
         else:

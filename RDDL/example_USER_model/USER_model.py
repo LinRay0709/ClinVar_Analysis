@@ -18,15 +18,27 @@ def self_defined_model(dropout_rate, model_name=None):
     '''
 
     # Edit the input layer(s) below
-
-    inputs = Input(shape=(28, 28, 1))
+    # Input shape: (sequence_length, num_channels) for 1D convolution
+    # Adjust the shape according to your data dimensions
+    
+    inputs = Input(shape=(1024, 8))  
 
     # Implement your model below
+    # Architecture: Input -> 1D Conv (ReLU) -> Global Average Pooling -> Dense -> Softmax
 
-    x = Flatten()(inputs)
-    x = Dense(100)(x)
+    # 1D Convolutional Layer with ReLU activation
+    x = Conv1D(filters=64, kernel_size=3, activation='relu', padding='same')(inputs)
+    
+    # Global Average Pooling Layer
+    x = GlobalAveragePooling1D()(x)
+    
+    # Dropout for regularization
     x = Dropout(dropout_rate)(x)
     
+    # Dense Layer
+    x = Dense(64, activation='relu')(x)
+    
+    # Softmax output layer (2 classes)
     outputs = Dense(2, activation='softmax')(x)
 
     # End of implementation

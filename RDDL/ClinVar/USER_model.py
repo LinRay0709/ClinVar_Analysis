@@ -32,11 +32,11 @@ def self_defined_model(dropout_rate, model_name=None):
     # Global Average Pooling Layer
     x = GlobalAveragePooling1D()(x)
     
-    # Dropout for regularization
-    x = Dropout(dropout_rate)(x)
-    
     # Dense Layer
     x = Dense(64, activation='relu')(x)
+
+    # Dropout for regularization
+    x = Dropout(dropout_rate)(x)
     
     # Softmax output layer (2 classes)
     outputs = Dense(2, activation='softmax')(x)

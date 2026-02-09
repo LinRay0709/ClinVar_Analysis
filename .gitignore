@@ -18,6 +18,8 @@ RDDL/ClinVar/USER_pos
 RDDL/ClinVar/__init__.py
 RDDL/RDDL_outputs/
 
+RDDL/ClinVar_overfit_test
+
 __pycache__/
 *.pyc
 .DS_Store

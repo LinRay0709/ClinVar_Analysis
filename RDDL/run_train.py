@@ -29,6 +29,8 @@ if __name__ == '__main__':
                         help='the specific GPU number', dest='gpu_number')
     parser.add_argument('-v', '--verbose', default=1, type=int, choices=[0, 1, 2],
                         help='verbosity mode')
+    parser.add_argument('-fold', default=None, type=str,
+                        help='specify which fold(s) to run, e.g. "1" or "1-3" (default: all folds)')
     a = parser.parse_args()
 
     env.environment_setup(a.name, gpu_device='CUDA', gpu_number=a.gpu_number, quiet_mode=(a.verbose == 0))
@@ -40,8 +42,19 @@ if __name__ == '__main__':
     # save the history in order to draw the learning curve
     z_stats, histories, predictions = list(), list(), list()
 
-    # start training five folds
-    for fold_num in range(1, env.K_FOLD + 1):
+    # 解析 fold 參數
+    if a.fold is None:
+        fold_list = list(range(1, env.K_FOLD + 1))
+    elif '-' in a.fold:
+        start, end = map(int, a.fold.split('-'))
+        fold_list = list(range(start, end + 1))
+    else:
+        fold_list = [int(a.fold)]
+    
+    print(f'將訓練的 Fold: {fold_list}')
+    
+    # start training specified folds
+    for fold_num in fold_list:
 
         tf.random.set_seed(p.random_seed)
         np.random.seed(p.random_seed)
@@ -71,7 +84,7 @@ if __name__ == '__main__':
         else:
             callbacks = [val_evaluater, scheduler.scheduler()]
 
-        print('\n%s %s (Fold %d/%d)' % (a.name, a.method, fold_num, env.K_FOLD))
+        print('\n%s %s (Fold %d/%d)' % (a.name, a.method, fold_num, len(fold_list)))
         model.compile(optimizer=tf.keras.optimizers.Adam(), loss=loss.sampling_loss())
         history = model.fit(train_gen, epochs=p.epochs, batch_size=p.batch_size,
                             steps_per_epoch=train_steps, verbose=a.verbose, callbacks=callbacks)
@@ -117,30 +130,31 @@ if __name__ == '__main__':
         en_info[a.method]['cv_folds'] = list()
         val_ranks = performance_rank(predictions)
         
-        for i in range(env.K_FOLD):
+        for i in range(len(fold_list)):
             en_info[a.method]['cv_folds'].append({'val_rank': val_ranks.index(i) + 1,
                                                   'z_mean': z_stats[i][0],
                                                   'z_std': z_stats[i][1]})
         f.write(json.dumps(en_info, sort_keys=False, indent=4))
     
+    num_folds = len(fold_list)
     draw_metric(env.WORKSPACE['plots'] / ('%s_learning_curve_f1-score.png' % a.method),
                 histories, 'f1-score',
-                title='%s %s %d-Fold Cross-Validation' % (a.name, a.method, env.K_FOLD))
+                title='%s %s %d-Fold Cross-Validation' % (a.name, a.method, num_folds))
     draw_curve(env.WORKSPACE['plots'] / ('%s_validation_ROC.png' % a.method),
                predictions, 'ROC',
-               title='%s %s %d-Fold Cross-Validation ROC' % (a.name, a.method, env.K_FOLD))
+               title='%s %s %d-Fold Cross-Validation ROC' % (a.name, a.method, num_folds))
     draw_curve(env.WORKSPACE['plots'] / ('%s_validation_PRC.png' % a.method),
                predictions, 'PRC',
-               title='%s %s %d-Fold Cross-Validation PRC' % (a.name, a.method, env.K_FOLD))
+               title='%s %s %d-Fold Cross-Validation PRC' % (a.name, a.method, num_folds))
     
     for metric in ['loss', 'accuracy', 'specificity', 'precision', 'recall', 'auROC']:
         draw_metric(env.WORKSPACE['other_metrics'] / ('%s_learning_curve_%s.png' % (a.method, metric)),
                     histories, metric,
-                    title='%s %s %d-Fold Cross-Validation' % (a.name, a.method, env.K_FOLD))
+                    title='%s %s %d-Fold Cross-Validation' % (a.name, a.method, num_folds))
 
     print()
     performance = [metric_scores(**_) for _ in predictions]
     tabulate([_.values() for _ in performance],
              headers=[to_formal(_) for _ in performance[0]],
-             v_headers=['Fold %d' % (_ + 1) for _ in range(env.K_FOLD)],
-             title='%d-FOLD CROSS-VALIDATION PERFORMANCE METRICS' % env.K_FOLD, float_fmt='%.3f')
+             v_headers=['Fold %d' % f for f in fold_list],
+             title='%d-FOLD CROSS-VALIDATION PERFORMANCE METRICS' % num_folds, float_fmt='%.3f')

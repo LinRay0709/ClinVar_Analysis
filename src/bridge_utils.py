@@ -113,3 +113,21 @@ def process_dataset(csv_filename, dataset_type):
         file_list.append([abs_path, label, weight])
         
     return pd.DataFrame(file_list, columns=['sample', 'label', 'weight'])
+
+def stratified_split(df, n_splits=5, random_state=42):
+    """
+    將 DataFrame 依標籤比例分層切分為 n 份
+    確保每個 fold 的正負樣本比例與原始資料一致
+    """
+    from sklearn.model_selection import StratifiedKFold
+    
+    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    
+    X = df.index
+    y = df['label'].values
+    
+    folds = []
+    for _, fold_idx in skf.split(X, y):
+        folds.append(df.iloc[fold_idx].copy())
+    
+    return folds

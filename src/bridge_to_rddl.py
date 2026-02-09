@@ -33,9 +33,8 @@ def main():
     # 4. 處理 Training Set 並切分 5-Fold
     train_df = utils.process_dataset('train.csv', 'Training Set')
     if train_df is not None:
-        print("正在將 Training Set 切分為 5 份 (for RDDL 5-Fold CV)...")
-        shuffled_train = train_df.sample(frac=1, random_state=42)
-        folds = np.array_split(shuffled_train, 5)
+        print("正在將 Training Set 切分為 5 份 (Stratified, for RDDL 5-Fold CV)...")
+        folds = utils.stratified_split(train_df, n_splits=5, random_state=42)
         
         for i, fold_df in enumerate(folds):
             out_path = os.path.join(cfg.SPLIT_INFO_DIR, f'training_{i+1}.csv')

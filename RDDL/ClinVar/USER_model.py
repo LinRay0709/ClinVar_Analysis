@@ -24,12 +24,11 @@ def self_defined_model(dropout_rate, model_name=None):
     inputs = Input(shape=(1024, 8))  
 
     # Implement your model below
-    # Architecture: Input -> 1D Conv (ReLU) -> Global Average Pooling -> Dense -> Softmax
 
-    # 1D Convolutional Layer with ReLU activation
+    # Conv1D
     x = Conv1D(filters=64, kernel_size=3, activation='relu', padding='same')(inputs)
-    
-    # Global Average Pooling Layer
+
+    # GlobalAveragePooling1D: (1024,64) → (64,)
     x = GlobalAveragePooling1D()(x)
     
     # Dense Layer

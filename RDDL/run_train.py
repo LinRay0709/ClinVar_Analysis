@@ -36,6 +36,10 @@ if __name__ == '__main__':
     env.environment_setup(a.name, gpu_device='CUDA', gpu_number=a.gpu_number, quiet_mode=(a.verbose == 0))
     user_model = importlib.import_module('%s.USER_model' % a.name)
 
+    # 產生時間戳記，用於輸出檔名避免覆蓋
+    run_timestamp = get_nowtime()
+    run_prefix = '%s_%s' % (run_timestamp, a.method)
+
     with open(env.WORKSPACE['USER_hyperparameters'] / ('%s.json' % a.method), 'r') as f:
         p = argparse.Namespace(**json.load(f))
 
@@ -92,7 +96,7 @@ if __name__ == '__main__':
         # save history & the weight of the model
         z_stats.append((z_mean, z_std))
         histories.append(refine_history(history.history))
-        model.save(env.WORKSPACE['models'] / ('%s_model_%d.h5' % (a.method, fold_num)))
+        model.save(env.WORKSPACE['models'] / ('%s_model_%d.h5' % (run_prefix, fold_num)))
 
         # start predicting five folds
         pred_gen, pred_steps, pred_labels = load_data('validation', fold_num, input_num,
@@ -103,9 +107,9 @@ if __name__ == '__main__':
         del model
         env.memory_recovery()
 
-    with open(env.WORKSPACE['tmp'] / ('%s_histories.pickle' % a.method), 'wb') as f:
+    with open(env.WORKSPACE['tmp'] / ('%s_histories.pickle' % run_prefix), 'wb') as f:
         pickle.dump(histories, f)
-    with open(env.WORKSPACE['tmp'] / ('%s_predictions.pickle' % a.method), 'wb') as f:
+    with open(env.WORKSPACE['tmp'] / ('%s_predictions.pickle' % run_prefix), 'wb') as f:
         pickle.dump(predictions, f)
     
     with open(env.WORKSPACE['models'] / 'ensemble_info.json', 'r+') as f:
@@ -121,7 +125,7 @@ if __name__ == '__main__':
         if a.method not in en_info:
             en_info[a.method] = dict()
 
-        en_info[a.method]['data_time'] = get_nowtime()
+        en_info[a.method]['data_time'] = run_timestamp
        
         for method in en_info:
             en_info[method]['en_val_rank'] = None
@@ -137,18 +141,18 @@ if __name__ == '__main__':
         f.write(json.dumps(en_info, sort_keys=False, indent=4))
     
     num_folds = len(fold_list)
-    draw_metric(env.WORKSPACE['plots'] / ('%s_learning_curve_f1-score.png' % a.method),
+    draw_metric(env.WORKSPACE['plots'] / ('%s_learning_curve_f1-score.png' % run_prefix),
                 histories, 'f1-score',
                 title='%s %s %d-Fold Cross-Validation' % (a.name, a.method, num_folds))
-    draw_curve(env.WORKSPACE['plots'] / ('%s_validation_ROC.png' % a.method),
+    draw_curve(env.WORKSPACE['plots'] / ('%s_validation_ROC.png' % run_prefix),
                predictions, 'ROC',
                title='%s %s %d-Fold Cross-Validation ROC' % (a.name, a.method, num_folds))
-    draw_curve(env.WORKSPACE['plots'] / ('%s_validation_PRC.png' % a.method),
+    draw_curve(env.WORKSPACE['plots'] / ('%s_validation_PRC.png' % run_prefix),
                predictions, 'PRC',
                title='%s %s %d-Fold Cross-Validation PRC' % (a.name, a.method, num_folds))
     
     for metric in ['loss', 'accuracy', 'specificity', 'precision', 'recall', 'auROC']:
-        draw_metric(env.WORKSPACE['other_metrics'] / ('%s_learning_curve_%s.png' % (a.method, metric)),
+        draw_metric(env.WORKSPACE['other_metrics'] / ('%s_learning_curve_%s.png' % (run_prefix, metric)),
                     histories, metric,
                     title='%s %s %d-Fold Cross-Validation' % (a.name, a.method, num_folds))
 

@@ -1,7 +1,6 @@
-# ClinVar RDDL 訓練診斷報告
+# ClinVar RDDL 訓練實驗紀錄
 
-> 日期：2026-02-09
-> 分析對象：OS1-1, OS1-2 方法，1 fold 訓練結果
+> 最後更新：2026-02-10
 
 ---
 
@@ -16,122 +15,341 @@
 | 每 fold 負樣本數 | ~8,997 |
 | 5-fold CV 訓練集 (4 folds) | pos ~270 / neg ~35,988 |
 | 驗證集 (1 fold) | pos 68 / neg 8,997 |
-| 輸入形狀 | (1024, 8) — 1024bp 序列 × 8 channels |
+| 輸入形狀 | (1024, 8) — ref one-hot(4) + alt one-hot(4) |
 
-## 2. 目前 Hyperparameters（OS1-1 與 OS1-2 完全相同）
-
-```json
-{
-  "batch_size": 64,
-  "dropout_rate": 0.3,
-  "epochs": 100,
-  "initial_lr": 0.001,
-  "decay_rate": 0.995,
-  "bottom_lr": 0.00001
-}
-```
-
-## 3. 訓練結果
-
-### 3.1 指標總覽
-
-| 方法 | Train F1 | Val F1（原始） | Val F1（resampled） | Val AUC | Val Precision | Val Recall |
-|------|----------|----------------|----------------------|---------|---------------|------------|
-| OS1-1 (1:1 oversampling) | 0.928 | 0.052 | 0.565 | 0.724 | 0.028 | 0.462 |
-| OS1-2 (1:2 oversampling) | 0.813 | 0.040 | 0.437 | 0.677 | 0.021 | 0.296 |
-
-### 3.2 Prediction 層面（最終模型對驗證集的預測）
-
-| 方法 | AUC | F1 | Accuracy | 驗證集 pos | 驗證集 neg |
-|------|-----|-----|----------|-----------|-----------|
-| OS1-1 | 0.724 | 0.046 | 0.857 | 68 | 8,997 |
-| OS1-2 | 0.677 | 0.044 | 0.890 | 68 | 8,997 |
-
-### 3.3 Learning Curve 觀察
-
-- **OS1-1**: Training F1 從 0.53 持續上升至 0.93；Val F1 始終在 0.02~0.06 之間徘徊，無改善趨勢。
-- **OS1-2**: Training F1 從 0.00 上升至 0.81；Val F1 同樣始終在 0.00~0.06 之間，無改善。
-- 兩者的 Sampled Validation F1 分別為 0.565 和 0.437，顯示模型在平衡的驗證集上有一定區分能力，但在原始分佈下完全失效。
-
-## 4. 問題診斷
-
-### 4.1 嚴重 Overfitting
-
-Training F1 高達 92%，真實 Validation F1 僅 ~5%，差距極大。
-
-**根本原因**：OS1-1 將 ~270 個正樣本 oversample 到 ~36,000 個，每個正樣本被重複約 133 次。模型直接記住了這些樣本而非學到泛化特徵。
-
-### 4.2 極端類別不平衡
-
-1:133 的比例使得：
-- Oversampling 方法需要極大量的重複，導致嚴重 overfitting
-- 驗證集僅有 68 個正樣本，precision 極低（~0.02），意味著模型做出的正預測中絕大多數是錯的
-- 高 accuracy（85-89%）是假象，全部預測為負也能達到 ~99% accuracy
-
-### 4.3 模型架構過於簡單
+### 模型架構（全部實驗共用）
 
 ```
-Conv1D(64, k=3) → GlobalAvgPool → Dense(64) → Dropout(0.3) → Dense(2, softmax)
+Conv1D(64, k=3, relu) → GlobalAvgPool → Dense(64, relu) → Dropout → Dense(2, softmax)
+Total trainable params: 5,890
 ```
-
-僅一層 Conv1D（kernel_size=3），對 1024bp 長序列的特徵提取能力不足，無法捕捉中長距離的序列模式。
-
-### 4.4 Hyperparameter 問題
-
-- `epochs=100`：從 learning curve 看，~20 epoch 後 validation 已停滯，後 80 epochs 只加劇 overfitting
-- `dropout_rate=0.3`：正則化強度不足以對抗嚴重 overfitting
-- `decay_rate=0.995`：衰減過慢，LR 在後期仍維持較高值
-
-## 5. 調整建議
-
-### 5.1 最優先：改用 Cost-Sensitive 方法
-
-建議優先嘗試不做 resampling 的方法，避免大量重複正樣本導致的 overfitting：
-
-1. **CW（Class Weight）**：用 class weight 加權 loss，不改變資料分佈
-2. **FL-gamma-2（Focal Loss）**：自動降低 easy negative 的權重，聚焦 hard examples
-3. **MFE（Mean False Error）**：專門為不平衡問題設計
-
-### 5.2 Hyperparameter 調整
-
-| 參數 | 原值 | 建議值 | 理由 |
-|------|------|--------|------|
-| `batch_size` | 64 | 32 | 較小 batch 增加梯度噪音，有助正則化；非 resampling 方法下更易採樣到正樣本 |
-| `dropout_rate` | 0.3 | 0.5 | 加強正則化以對抗 overfitting |
-| `epochs` | 100 | 50 | Validation 約 20 epoch 後停滯，減少無效訓練 |
-| `initial_lr` | 0.001 | 0.0005 | 較低 LR 配合較少 epochs，學習更穩定 |
-| `decay_rate` | 0.995 | 0.98 | 更快衰減，避免後期 overfitting |
-| `bottom_lr` | 0.00001 | 0.00001 | 維持不變 |
-
-### 5.3 模型架構建議（未來可修改 USER_model.py）
-
-建議改為多層 CNN + BatchNorm：
-
-```python
-x = Conv1D(32, 7, activation='relu', padding='same')(inputs)
-x = BatchNormalization()(x)
-x = MaxPooling1D(4)(x)
-x = Conv1D(64, 5, activation='relu', padding='same')(x)
-x = BatchNormalization()(x)
-x = GlobalAveragePooling1D()(x)
-x = Dense(32, activation='relu')(x)
-x = Dropout(dropout_rate)(x)
-outputs = Dense(2, activation='softmax')(x)
-```
-
-### 5.4 建議實驗順序
-
-1. 先用 **CW** 方法 + 新 hyperparameters 跑 1 fold 測試
-2. 再用 **FL-gamma-2** + 同樣 hyperparameters 比較
-3. 如果效果仍不理想，再修改模型架構
-4. 最後回頭跑 OS1-1 做對照組
 
 ---
 
-## 附錄：LR Schedule 細節
+## 2. 實驗紀錄
+
+### 實驗 1：OS1-1 原始參數（1 fold）
+
+**日期**：2026-02-09
+**方法**：OS1-1（1:1 oversampling，~270 正樣本複製到 ~36,000）
+
+**Hyperparameters**：
+```json
+{ "batch_size": 64, "dropout_rate": 0.3, "epochs": 100, "initial_lr": 0.001, "decay_rate": 0.995 }
+```
+
+**結果**：
+
+| 指標 | Train (epoch 100) | Val (原始分佈) | Val (resampled) |
+|------|-------------------|----------------|-----------------|
+| F1 | 0.928 | 0.052 | 0.565 |
+| AUC | 0.972 | 0.724 | — |
+| Precision | 0.880 | 0.028 | 0.762 |
+| Recall | 0.982 | 0.462 | 0.450 |
+
+**逐 epoch 關鍵數據**：
+
+| Epoch | train_f1 | val_f1 | samp_val_f1 | val_auROC |
+|-------|----------|--------|-------------|-----------|
+| 1 | 0.534 | 0.020 | 0.488 | 0.605 |
+| 9 | 0.650 | 0.020 | **0.691** (peak) | 0.645 |
+| 20 | 0.711 | 0.019 | 0.464 | 0.619 |
+| 50 | 0.822 | 0.021 | 0.495 | 0.626 |
+| 100 | 0.928 | 0.052 | 0.565 | 0.746 |
+
+**發現**：
+- 嚴重 overfitting：train F1=0.93 vs val F1=0.05
+- samp_val_f1 在 **epoch 9** 即達到 peak (0.69)，之後波動下降
+- 每個正樣本被重複 ~133 次，模型記住了樣本而非學到泛化特徵
+- 99 個 epoch 的正樣本重複 ~133 次 × 100 epochs = 每個樣本被看了 ~13,300 次
+
+---
+
+### 實驗 2：OS1-2 原始參數（1 fold）
+
+**日期**：2026-02-09
+**方法**：OS1-2（1:2 oversampling，正樣本補到負樣本的一半）
+
+**Hyperparameters**：同實驗 1
+
+**結果**：
+
+| 指標 | Train (epoch 100) | Val (原始分佈) | Val (resampled) |
+|------|-------------------|----------------|-----------------|
+| F1 | 0.813 | 0.040 | 0.437 |
+| AUC | 0.945 | 0.677 | — |
+| Precision | 0.801 | 0.021 | 0.613 |
+| Recall | 0.826 | 0.296 | 0.339 |
+
+**發現**：
+- 同樣嚴重 overfitting，且比 OS1-1 更差
+- OS1-2 的 resampled 比例是 1:2，正樣本數量較少但仍大量重複
+- Val AUC 0.677 低於 OS1-1 的 0.724，判別能力更弱
+- 結論：在此資料集上 OS1-2 不如 OS1-1
+
+---
+
+### 實驗 3：CW 調整參數（5 fold）
+
+**日期**：2026-02-09
+**方法**：CW（Class Weight）— 不做 resampling，用 alpha 加權 loss
+
+**Hyperparameters**：
+```json
+{ "batch_size": 32, "dropout_rate": 0.5, "epochs": 50, "initial_lr": 0.0005, "decay_rate": 0.98 }
+```
+
+**結果**（5-fold 平均）：
+
+| 指標 | Train (epoch 50) | Val |
+|------|-------------------|-----|
+| F1 | 0.000 | 0.000 |
+| AUC | — | 0.574 |
+| Precision | 0.000 | 0.000 |
+| Recall | 0.000 | 0.000 |
+| Accuracy | 0.993 | 0.993 |
+
+**各 fold AUC**：0.617, 0.570, 0.600, 0.510, 0.603
+
+**發現**：
+- **完全失敗**：模型全部預測為 negative，F1/Precision/Recall 全為 0
+- 99.25% accuracy 是假象 = 全猜 negative 的正確率
+- AUC 僅 0.574，接近隨機 (0.5)
+- **根因分析**：CW 保持原始 1:133 分佈，batch_size=32 時每 batch 平均只有 0.24 個正樣本。大多數 batch 完全沒有正樣本，class weight 加權無的可加，梯度完全被負樣本主導
+- **結論**：在 1:133 這種極端不平衡下，CW 不適用。必須透過 resampling 確保模型在每次梯度更新中都能看到正樣本
+
+---
+
+### 實驗 4：OS1-1 調整 hyperparameters（1 fold）
+
+**日期**：2026-02-10
+**方法**：OS1-1（同實驗 1），調整 hyperparameters 以對抗 overfitting
+
+**Hyperparameters**：
+```json
+{ "batch_size": 64, "dropout_rate": 0.5, "epochs": 30, "initial_lr": 0.001, "decay_rate": 0.98 }
+```
+
+**變更理由**：
+
+| 參數 | 實驗1 | 實驗4 | 理由 |
+|------|-------|-------|------|
+| dropout_rate | 0.3 | **0.5** | 主要瓶頸是 overfitting，大幅提升正則化 |
+| epochs | 100 | **30** | samp_val_f1 在 epoch 9 peak，30 epochs 足夠收斂且避免後期 overfit |
+| decay_rate | 0.995 | **0.98** | 30 epochs 中 warmup 6 個 epoch，decay phase 需更積極衰減 |
+
+**結果**：
+
+| 指標 | Train (epoch 30) | Val (原始分佈) | Val (resampled) |
+|------|-------------------|----------------|-----------------|
+| F1 | 0.767 | 0.027 | 0.561 |
+| AUC | — | 0.646 | — |
+| Precision | — | 0.011 | — |
+| Recall | — | 0.544 | — |
+| Accuracy | — | 0.637 | — |
+
+**逐 epoch 關鍵數據**：
+
+| Epoch | train_f1 | val_f1 | samp_val_f1 | val_auROC | val_loss |
+|-------|----------|--------|-------------|-----------|----------|
+| 1 | 0.533 | 0.020 | 0.508 | 0.602 | 0.665 |
+| 5 | 0.615 | 0.023 | 0.523 | 0.660 | 0.607 |
+| 9 | 0.660 | 0.020 | **0.702** (peak) | 0.654 | 0.778 |
+| 15 | 0.703 | 0.023 | 0.661 | 0.667 | 0.700 |
+| 20 | 0.731 | 0.020 | 0.604 | 0.642 | 0.569 |
+| 30 | 0.767 | 0.027 | 0.561 | 0.690 | 0.523 |
+
+**與實驗 1 對比**：
+
+| | 實驗 1 | 實驗 4 | 變化 |
+|---|---|---|---|
+| Train F1 (最終) | 0.928 | 0.767 | -0.16（overfitting 減少） |
+| Val AUC | **0.724** | 0.646 | -0.08（變差） |
+| Val F1 (原始) | 0.052 | 0.027 | -0.03（變差） |
+| samp_val_f1 peak | 0.691 (ep 9) | **0.702** (ep 9) | +0.01（持平） |
+| Train-Val F1 gap | 0.876 | 0.740 | 縮小 0.14 |
+
+**發現**：
+- Overfitting 被抑制：train F1 從 0.93 降到 0.77，train-val gap 縮小
+- samp_val_f1 peak 持平（0.70），且再次出現在 **epoch 9**，確認這是此模型架構的泛化上限
+- Val AUC 從 0.724 降到 0.646：dropout=0.5 可能過強，壓制了模型表達能力
+- **結論：hyperparameter 調整已到達此模型架構的極限。兩次實驗 samp_val_f1 都在 epoch 9 peak 於 ~0.70，是單層 Conv1D(64, k=3) 的天花板。需升級模型架構才能突破**
+
+---
+
+### 實驗 5：OS1-1 新模型架構 v1（1 fold）
+
+**日期**：2026-02-10
+**方法**：OS1-1，更換模型架構（kernel_size 3→11 + BatchNorm + MaxPooling）
+
+**模型架構**：
+```
+Conv1D(64, k=11) → BN → MaxPool(4) → GlobalAvgPool → Dense(64) → Dropout(0.5) → Dense(2)
+Trainable params: 10,114
+```
+
+**Hyperparameters**：同實驗 4
+```json
+{ "batch_size": 64, "dropout_rate": 0.5, "epochs": 30, "initial_lr": 0.001, "decay_rate": 0.98 }
+```
+
+**結果**：
+
+| 指標 | Train (epoch 30) | Val (原始分佈) | Val (resampled) |
+|------|-------------------|----------------|-----------------|
+| F1 | 0.997 | 0.015 | 0.058 |
+| AUC | — | 0.644 | — |
+| Precision | — | 0.037 | — |
+| Recall | — | 0.029 | — |
+| Accuracy | — | 0.987 | — |
+
+**逐 epoch 關鍵數據**：
+
+| Epoch | train_f1 | val_f1 | samp_val_f1 | val_auROC | val_loss |
+|-------|----------|--------|-------------|-----------|----------|
+| 1 | 0.628 | 0.030 | 0.244 | 0.667 | 0.387 |
+| 3 | 0.796 | 0.026 | 0.413 | 0.628 | 0.373 |
+| 5 | 0.848 | 0.018 | 0.079 | 0.590 | 0.109 |
+| 9 | 0.880 | 0.016 | 0.030 | 0.562 | 0.096 |
+| 15 | 0.900 | 0.033 | 0.058 | 0.526 | 0.132 |
+| 20 | 0.913 | 0.026 | 0.437 | 0.595 | 0.506 |
+| 26 | 0.917 | 0.027 | **0.474** (peak) | 0.611 | 0.643 |
+| 28 | 0.997 | 0.037 | 0.108 | 0.538 | 0.175 |
+| 30 | 0.997 | 0.015 | 0.058 | 0.517 | 0.218 |
+
+**與舊模型對比（實驗 4 vs 實驗 5，同 hyperparameters）**：
+
+| | 實驗 4（舊模型 k=3） | 實驗 5（新模型 k=11+BN+MaxPool） |
+|---|---|---|
+| Trainable params | 5,890 | 10,114 |
+| Train F1 (最終) | 0.767 | 0.997（更嚴重 overfit） |
+| Val AUC | 0.646 | 0.644（持平） |
+| samp_val_f1 peak | **0.702** (ep 9) | 0.474 (ep 26)（大幅下降） |
+| samp_val_f1 穩定性 | 穩定（0.46-0.70） | 極不穩定（0.00-0.47） |
+
+**發現**：
+- **結果比舊模型更差**：增加模型容量反而加劇 overfitting
+- Train F1 在 epoch 3 就到 0.80，epoch 28 爆升到 0.997 — 更大的 kernel + 更多參數讓模型記憶能力更強
+- samp_val_f1 極度不穩定（0.00 到 0.47 之間劇烈跳動），舊模型穩定在 0.46-0.70
+- val_loss 極低（0.08-0.15）但 val_f1 也極低 — 模型非常自信地全猜 negative
+- **根因**：增加模型容量在沒有足夠正樣本的情況下，只讓模型更快更徹底地 overfit。BN 加速收斂反而讓 overfitting 更早發生
+- **核心教訓：瓶頸不只是模型架構，更根本的是 270 個 unique 正樣本被重複 133 次。增加模型容量不能解決這個問題**
+
+---
+
+### 實驗 6：OS1-1 只改 kernel_size 3→11（1 fold）
+
+**日期**：2026-02-10
+**方法**：OS1-1，隔離測試 kernel_size 影響（移除 BN 和 MaxPool，只改 k）
+
+**模型架構**：
+```
+Conv1D(64, k=11) → GlobalAvgPool → Dense(64) → Dropout(0.5) → Dense(2)
+Trainable params: ~9,800
+```
+
+**Hyperparameters**：同實驗 4/5
+```json
+{ "batch_size": 64, "dropout_rate": 0.5, "epochs": 30, "initial_lr": 0.001, "decay_rate": 0.98 }
+```
+
+**結果**：
+
+| 指標 | Train (epoch 30) | Val (原始分佈) |
+|------|-------------------|----------------|
+| F1 | 0.982 | 0.028 |
+| AUC | — | 0.650 |
+| Precision | — | 0.025 |
+| Recall | — | 0.132 |
+
+**逐 epoch 關鍵數據**：
+
+| Epoch | train_f1 | val_f1 | samp_val_f1 | val_auROC | val_loss |
+|-------|----------|--------|-------------|-----------|----------|
+| 1 | 0.522 | 0.020 | 0.471 | 0.609 | 0.661 |
+| 2 | 0.534 | 0.017 | **0.683** (peak) | 0.662 | 0.748 |
+| 4 | 0.637 | 0.029 | 0.667 | **0.694** | 0.602 |
+| 6 | 0.708 | 0.021 | 0.256 | 0.652 | 0.382 |
+| 9 | 0.824 | 0.021 | 0.545 | 0.634 | 0.628 |
+| 15 | 0.939 | 0.028 | 0.419 | 0.631 | 0.379 |
+| 20 | 0.963 | 0.026 | 0.264 | 0.608 | 0.214 |
+| 30 | 0.982 | 0.028 | 0.230 | 0.559 | 0.159 |
+
+**三種架構比較（實驗 4 vs 5 vs 6，同 HP）**：
+
+| | 實驗 4 (k=3) | 實驗 5 (k=11+BN+MaxPool) | 實驗 6 (k=11 only) |
+|---|---|---|---|
+| Trainable params | 5,890 | 10,114 | ~9,800 |
+| Train F1 (最終) | 0.767 | 0.997 | 0.982 |
+| Val AUC | 0.646 | 0.644 | 0.650 |
+| samp_val_f1 peak | **0.702** (ep 9) | 0.474 (ep 26) | 0.683 (ep 2) |
+| samp_val_f1 穩定性 | **穩定 (0.46-0.70)** | 極不穩定 (0.00-0.47) | 前 5ep 好，之後崩落 |
+| Overfitting 速度 | 慢（ep30 才 0.77） | 快 | 快（ep12 超過 0.90） |
+
+**發現**：
+- k=11 本身沒有改善泛化能力：samp_val_f1 peak (0.683) 略低於 k=3 (0.702)
+- k=11 讓 overfitting 加速：peak 在 epoch 2 就到達（k=3 在 epoch 9），之後快速崩落到 0.23
+- 移除 BN 後比實驗 5 好（0.683 vs 0.474），確認 **BN 是加速 overfitting 的主因**
+- 更大 kernel = 每層看 11bp×8ch=88 values（vs k=3 的 24 values）= 更強記憶力 = 更快 overfit
+- **結論：在 270 個 unique 正樣本的條件下，k=3 的小模型反而是最佳選擇。額外的參數全用在記憶而非泛化**
+
+---
+
+## 3. 跨實驗比較
+
+| | 實驗1 | 實驗2 | 實驗3 | 實驗4 | 實驗5 | 實驗6 |
+|---|---|---|---|---|---|---|
+| 方法 | OS1-1 | OS1-2 | CW | OS1-1 | OS1-1 | OS1-1 |
+| 模型 | k=3 | k=3 | k=3 | k=3 | k=11+BN+MP | **k=11** |
+| HP | 原始 | 原始 | 調整 | 調整 | 調整 | 調整 |
+| Val AUC | **0.724** | 0.677 | 0.574 | 0.646 | 0.644 | 0.650 |
+| Val F1 | 0.052 | 0.040 | 0.000 | 0.027 | 0.015 | 0.028 |
+| sv_f1 peak | 0.691 | — | N/A | **0.702** | 0.474 | 0.683 |
+| Train F1 | 0.928 | 0.813 | 0.000 | 0.767 | 0.997 | 0.982 |
+| Overfit | 嚴重 | 嚴重 | underfit | 中等 | 最嚴重 | 嚴重 |
+
+**關鍵發現**：
+1. **OS1-1 + k=3 + 原始 HP** 仍是 Val AUC 最高的組合 (0.724)
+2. **OS1-1 + k=3 + 調整 HP** 的 samp_val_f1 peak 最高 (0.702)，且最穩定
+3. CW 在 1:133 下完全失敗
+4. 增加 kernel size（實驗 5, 6）或加 BN（實驗 5）都**加劇 overfitting**
+5. BN 是實驗 5 崩潰的主因（實驗 6 移除 BN 後改善）
+6. 核心瓶頸確認為**正樣本數量太少（270 個）被重複 133 次**
+
+## 4. 已識別的瓶頸（依優先級排序）
+
+### 4.1 正樣本絕對數量太少（最根本問題）
+
+- 全部只有 423 個 unique 正樣本，每 fold 訓練用 ~270 個
+- OS1-1 將 270 個樣本重複 133 次，模型容易記住而非泛化
+- 增加模型容量（k=11, BN, MaxPool）都只會讓記憶更快更徹底（實驗 5, 6 證實）
+
+### 4.2 模型容量需保持小
+
+- k=3, 5890 params 的小模型是目前最佳：overfit 最慢，samp_val_f1 最穩定
+- 任何增加參數的改動都加速 overfitting
+- 在資料量不變的前提下，模型應往「更小更正則化」的方向走，而非「更大更複雜」
+
+### 4.3 Hyperparameter 已接近最優
+
+- OS1-1 + dropout=0.5 + epochs=30 是目前最佳 HP 配置
+- 進一步調整 HP 的邊際效益極低
+
+---
+
+## 5. 下一步方向
+
+模型架構升級路線已確認不可行（實驗 5, 6）。剩餘可能方向：
+1. **回到 k=3 最佳配置（實驗 4），縮短 epochs 到 10** — 在 samp_val_f1 peak (ep9) 附近停止
+2. **降低模型容量 (filters 64→32)** — 進一步限制記憶能力
+3. **增加正樣本數量** — 從資料源頭解決問題（放寬 ClinVar 篩選條件、使用其他資料庫）
+
+---
+
+## 附錄：LR Schedule 機制
 
 ```
-Epoch 1-20 (前 20%): cosine warmup，LR = initial_lr * cos(1 - epoch/20)
-Epoch 21-90 (20%-90%): exponential decay，LR = initial_lr * decay_rate^(epoch-20)
-Epoch 91-100 (後 10%): 固定為 bottom_lr
+前 20% epochs: cosine warmup，LR = initial_lr * cos(1 - epoch / change_pt)
+20%-90% epochs: exponential decay，LR = initial_lr * decay_rate^(epoch - change_pt)
+後 10% epochs: 固定為 bottom_lr
 ```
